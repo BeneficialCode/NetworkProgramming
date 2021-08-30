@@ -96,7 +96,7 @@ int main() {
 					for (j = 0; j < max_socket; ++j)
 						if (FD_ISSET(j, &master)) {
 							// it's the listening socket and 
-							// it's the same socket that sent the data in the frist place
+							// it's the same socket that sent the data in the first place
 							if (j == socket_listen || j == i)
 								continue;
 							else

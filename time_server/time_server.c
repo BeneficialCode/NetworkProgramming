@@ -4,7 +4,7 @@
 #endif
 #include <WinSock2.h>
 #include <WS2tcpip.h>
-#pragma comment(lib,"w32_32.lib")
+#pragma comment(lib,"ws2_32.lib")
 #else
 #include <sys/types.h>
 #include <sys/socket.h>
