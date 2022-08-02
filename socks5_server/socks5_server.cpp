@@ -53,7 +53,7 @@ int main(){
 	hints.ai_flags = AI_PASSIVE;
 
 	addrinfo* bind_address;
-	getaddrinfo(0, "8080", &hints, &bind_address);
+	getaddrinfo(0, "8888", &hints, &bind_address);
 
 	printf("Create socket...\n");
 	SOCKET socket_listen;

@@ -80,7 +80,7 @@ int main() {
 		printf("%s\n", address_buffer);
 
 		SSL* ssl = SSL_new(ctx);
-		if (!ctx) {
+		if (!ssl) {
 			fprintf(stderr, "SSL_new() failed.\n");
 			return 1;
 		}

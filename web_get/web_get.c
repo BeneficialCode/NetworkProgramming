@@ -238,6 +238,7 @@ void parse_url(char* url, char** hostname, char** port, char** path) {
 	}
 	*p = 0;
 
+	++p;
 	// attemps to find a hash
 	while (*p && *p != '#')
 		++p;

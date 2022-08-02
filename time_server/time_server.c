@@ -31,7 +31,7 @@
 #include <string.h>
 #include <time.h>
 
-int main() {
+int main(int argc,char* argv[]) {
 #if defined(_WIN32)
 	WSADATA d;
 	if (WSAStartup(MAKEWORD(2, 2), &d)) {
@@ -39,6 +39,12 @@ int main() {
 		return 1;
 	}
 #endif
+
+	if (argc < 2) {
+		fprintf(stderr, "usage: time_server port\n");
+		return 1;
+	}
+
 	printf("Configuring local address...\n");
 	struct addrinfo hints;
 	memset(&hints, 0, sizeof(hints));
@@ -47,7 +53,7 @@ int main() {
 	hints.ai_flags = AI_PASSIVE;
 
 	struct addrinfo* bind_address;
-	getaddrinfo(0, "8080", &hints, &bind_address);
+	getaddrinfo(0, argv[1], &hints, &bind_address);
 	printf("Creating socket...\n");
 	SOCKET socket_listen;
 	socket_listen = socket(bind_address->ai_family,
