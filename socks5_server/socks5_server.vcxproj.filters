@@ -26,5 +26,8 @@
     <ClInclude Include="Socks5.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="Socks5Common.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

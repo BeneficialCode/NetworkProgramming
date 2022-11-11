@@ -59,12 +59,14 @@ int main(int argc,char* argv[]) {
 	socket_listen = socket(bind_address->ai_family,
 		bind_address->ai_socktype, bind_address->ai_protocol);
 	if (!ISVALIDSOCKET(socket_listen)) {
+		freeaddrinfo(bind_address);
 		fprintf(stderr, "socket() failed. (%d)\n", GETSOCKETERRNO());
 		return 1;
 	}
 	printf("Binding socket to local address...\n");
 	if (bind(socket_listen, bind_address->ai_addr,
 		bind_address->ai_addrlen)) {
+		freeaddrinfo(bind_address);
 		fprintf(stderr, "bind() failed.\n");
 		return 1;
 	}

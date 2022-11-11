@@ -31,112 +31,210 @@
 #include <string.h>
 #include "Socks5.h"
 
+
 int SelectMethod(int sock) {
 	char read[1024] = { 0 };
-	char reply[2] = { 0 };
 
-	METHOD_SELECT_REQUEST* method_request;
-	METHOD_SELECT_RESPONSE* method_response;
-
+	METHOD_SELECT_REQUEST* request;
 	int bytes_received = recv(sock, read, sizeof(read), 0);
 	if (bytes_received < 1) { // the client has disconnected
 		return -1;
 	}
 
-	method_request = (METHOD_SELECT_REQUEST*)read;
-	method_response = (METHOD_SELECT_RESPONSE*)reply;
-
-	method_response->version = VERSION;
-	if (method_request->version != VERSION) {
-		method_response->select_method = 0xFF;
-		send(sock, reply, sizeof(METHOD_SELECT_RESPONSE), 0);
+	size_t request_len = sizeof(METHOD_SELECT_REQUEST);
+	if (bytes_received < request_len)
 		return -1;
-	}
 
-	method_response->select_method = AUTH_CODE;
-	send(sock, reply, sizeof(METHOD_SELECT_RESPONSE), 0);
+	request = (METHOD_SELECT_REQUEST*)read;
+	
+	int method_len = request->nmethods + sizeof(METHOD_SELECT_REQUEST);
+	if (bytes_received < method_len)
+		return -1;
+
+	METHOD_SELECT_RESPONSE response;
+	response.ver = SVERSION;
+	response.method = METHOD_UNACCEPTABLE;
+	for(int i=0;i<request->nmethods;i++)
+		if (request->methods[i] == METHOD_NOAUTH) {
+			response.method = METHOD_NOAUTH;
+			break;
+		}
+
+	if (response.method == METHOD_UNACCEPTABLE)
+		return -1;
+
+	char* send_buf = (char*)&response;
+	send(sock, send_buf, sizeof(response), 0);
 
 	return 0;
 }
 
 int ParseCommand(int sock) {
 	char read[1024] = { 0 };
-	char reply[1024];
+	char reply[64];
 
-	SOCKS5_REQUEST* socks5_request;
-	SOCKS5_RESPONSE* socks5_response;
+	SOCKS5_REQUEST* request;
 
 	int bytes_received = recv(sock, read, sizeof(read), 0);
 	if (bytes_received < 1) { // the client has disconnected
 		return -1;
 	}
 
-	socks5_request = (PSOCKS5_REQUEST)read;
-	if (socks5_request->version != VERSION ||
-		socks5_request->cmd != CONNECT || socks5_request->address_type == IPV6) {
+	request = (PSOCKS5_REQUEST)read;
+	size_t request_len = sizeof(SOCKS5_REQUEST);
+	if (bytes_received < request_len) {
 		return -1;
 	}
 
-	printf("begin process connect request\n");
+	SOCKS5_RESPONSE response;
+	response.ver = SVERSION;
+	response.reply = SOCKS5_REP_SUCCEEDED;
+	response.reserved = 0;
+	response.atyp = SOCKS5_ATYP_IPV4;
+
 	struct sockaddr_in sin;
 	memset(&sin, 0, sizeof(sin));
-	sin.sin_family = AF_INET;
 
-	printf("get real server's ip address\n");
-	if (socks5_request->address_type == IPV4) {
-		memcpy(&sin.sin_addr.S_un.S_addr, &socks5_request->address_type +
-			sizeof(socks5_request->address_type), 4);
-		memcpy(&sin.sin_port, &socks5_request->address_type +
-			sizeof(socks5_request->address_type) + 4, 2);
-		printf("Real Server: %s:%d\n", inet_ntoa(sin.sin_addr), ntohs(sin.sin_port));
+	printf("begin process socks5 request\n");
+	if (request->cmd == SOCKS5_CMD_UDP_ASSOCIATE) {
+		printf("udp assc request accepted\n");
+		socklen_t addr_len = sizeof(sin);
+		if (getsockname(sock, (struct sockaddr*)&sin, &addr_len) < 0) {
+			return -1;
+		}
+
+		memcpy(reply, &response, sizeof(response));
+		memcpy(reply + sizeof(response), &sin.sin_addr, sizeof(sin.sin_addr));
+		memcpy(reply + sizeof(response) + sizeof(sin.sin_addr), &sin.sin_port, sizeof(sin.sin_port));
+
+		int reply_size = sizeof(SOCKS5_RESPONSE) + sizeof(sin.sin_addr) + sizeof(sin.sin_port);
+
+		int s = send(sock, reply, reply_size, 0);
+		if (s < reply_size) {
+			return -1;
+		}
+
+		return -1;
 	}
-	else if (socks5_request->address_type == DOMAIN) {
-		char domainLenth = *(&socks5_request->address_type + sizeof(socks5_request->address_type));
-		char target_domain[256] = { 0 };
+	else if (request->cmd != SOCKS5_CMD_CONNECT) {
+		printf("unsupported command: %d", request->cmd);
+		return -1;
+	}
 
-		strncpy(target_domain, &socks5_request->address_type + 2, (unsigned int)domainLenth);
+	int real_server_sock = -1;
+
+	int atyp = request->atyp;
+	printf("get real server's ip address\n");
+	if (atyp == SOCKS5_ATYP_IPV4) {
+		sin.sin_family = AF_INET;
+		size_t in_addr_len = sizeof(in_addr);
+		if (bytes_received < request_len + in_addr_len + 2) {
+			return -1;
+		}
+		memcpy(&sin.sin_addr.S_un.S_addr, &request->atyp +
+			sizeof(request->atyp), 4);
+		memcpy(&sin.sin_port, &request->atyp +
+			sizeof(request->atyp) + 4, 2);
+		printf("Real Server: %s:%d\n", inet_ntoa(sin.sin_addr), ntohs(sin.sin_port));
+		printf("Connecting real server...\n");
+		real_server_sock = socket(AF_INET, SOCK_STREAM, 0);
+		if (real_server_sock < 0) {
+			return -1;
+		}
+		if (connect(real_server_sock, (struct sockaddr*)&sin, sizeof(sockaddr_in))) {
+			response.reply = SOCKS5_REP_GENERAL;
+			memcpy(reply, &response, sizeof(response));
+			memcpy(reply + sizeof(response), &sin.sin_addr, sizeof(sin.sin_addr));
+			memcpy(reply + sizeof(response) + sizeof(sin.sin_addr), &sin.sin_port, sizeof(sin.sin_port));
+
+			int reply_size = sizeof(SOCKS5_RESPONSE) + sizeof(sin.sin_addr) + sizeof(sin.sin_port);
+
+			int s = send(sock, reply, reply_size, 0);
+			if (s < reply_size) {
+				return -1;
+			}
+		}
+	}
+	else if (atyp == SOCKS5_ATYP_DOMAIN) {
+		char domainLength = *(&request->atyp + sizeof(request->atyp));
+		char target_domain[256] = { 0 };
+		strncpy(target_domain, (char*)&request->atyp + 2, (unsigned int)domainLength);
+		target_domain[domainLength] = '\0';
 		printf("target: %s\n", target_domain);
-		struct hostent* phost = gethostbyname(target_domain);
-		if (phost == nullptr) {
+		struct hostent* remoteHost = gethostbyname(target_domain);
+		if (remoteHost == nullptr) {
 			fprintf(stderr, "resolve %s error!\n", target_domain);
 			return -1;
 		}
-		memcpy(&sin.sin_addr, phost->h_addr_list[0], phost->h_length);
-		memcpy(&sin.sin_port, &socks5_request->address_type +
-			sizeof(socks5_request->address_type) + sizeof(domainLenth) + domainLenth, 2);
-	}
+		sin.sin_family = remoteHost->h_addrtype;
+		memcpy(&sin.sin_addr, remoteHost->h_addr_list[0], remoteHost->h_length);
+		memcpy(&sin.sin_port, &request->atyp +
+			sizeof(request->atyp) + sizeof(domainLength) + domainLength, 2);
+		printf("Real Server: %s:%d\n", inet_ntoa(sin.sin_addr), ntohs(sin.sin_port));
+		printf("Connecting real server...\n");
 
-	printf("try to creat socket with real server...\n");
-	int real_server_sock = socket(AF_INET, SOCK_STREAM, 0);
-	if (real_server_sock < 0) {
-		fprintf(stderr, "socket() failed (%d)\n", GETSOCKETERRNO());
+		switch (remoteHost->h_addrtype)
+		{
+			case AF_INET:
+				real_server_sock = socket(AF_INET, SOCK_STREAM, 0);
+				break;
+
+			case AF_INET6:
+				real_server_sock = socket(AF_INET6, SOCK_STREAM, 0);
+				break;
+			default:
+				break;
+		}
+		
+		if (real_server_sock < 0) {
+			return -1;
+		}
+
+		if (connect(real_server_sock, (struct sockaddr*)&sin, sizeof(sockaddr_in))) {
+			fprintf(stderr, "socket() failed (%d)\n", GETSOCKETERRNO());
+			response.reply = SOCKS5_REP_GENERAL;
+			memcpy(reply, &response, sizeof(response));
+			memcpy(reply + sizeof(response), &sin.sin_addr, sizeof(sin.sin_addr));
+			memcpy(reply + sizeof(response) + sizeof(sin.sin_addr), &sin.sin_port, sizeof(sin.sin_port));
+
+			int reply_size = sizeof(SOCKS5_RESPONSE) + sizeof(sin.sin_addr) + sizeof(sin.sin_port);
+
+			int s = send(sock, reply, reply_size, 0);
+			if (s < reply_size) {
+				return -1;
+			}
+		}
+	}
+	else if (atyp == SOCKS5_ATYP_IPV6) {
+		sin.sin_family = AF_INET6;
 		return -1;
 	}
-
-	memset(reply, 0, sizeof(reply));
-
-	socks5_response = (PSOCKS5_RESPONSE)reply;
-	socks5_response->version = VERSION;
-	socks5_response->reserved = 0x0;
-	socks5_response->address_type = 0x01;
-	memset(socks5_response + 4, 0, 6);
-
-	printf("Connecting real server...\n");
-	if (connect(real_server_sock, (struct sockaddr*)&sin,
-		sizeof(sockaddr_in))) {
-		socks5_response->reply = 0x01;
-		send(sock, reply, 10, 0);
+	else {
+		printf("unsupported addrtype: %d", request->atyp);
 		return -1;
 	}
+	
+	memcpy(reply, &response, sizeof(response));
+	memcpy(reply + sizeof(response), &sin.sin_addr, sizeof(sin.sin_addr));
+	memcpy(reply + sizeof(response) + sizeof(sin.sin_addr), &sin.sin_port, sizeof(sin.sin_port));
 
-	socks5_response->reply = 0x00;
-	send(sock, reply, 10, 0);
+	int reply_size = sizeof(SOCKS5_RESPONSE) + sizeof(sin.sin_addr) + sizeof(sin.sin_port);
+
+	int s = send(sock, reply, reply_size, 0);
+	if (s < reply_size) {
+		return -1;
+	}
 
 	return real_server_sock;
 }
 
 int ForwardData(int sock, int real_server_sock) {
 	char read[4096] = { 0 };
+
+	if (real_server_sock == -1) {
+		printf("invalid remote\n");
+		return -1;
+	}
 
 	FD_SET fd_reads;
 	struct timeval timeout;
