@@ -50,7 +50,7 @@ struct fd_state {
 };
 
 struct fd_state* alloc_fd_state(struct event_base* base, evutil_socket_t fd) {
-    struct fd_state* state = malloc(sizeof(struct fd_state));
+    struct fd_state* state = (fd_state*)malloc(sizeof(struct fd_state));
     if (!state)
         return NULL;
     state->read_event = event_new(base, fd, EV_READ | EV_PERSIST, do_read, state);
@@ -82,7 +82,7 @@ free_fd_state(struct fd_state* state) {
 
 void
 do_read(evutil_socket_t fd, short events, void* arg) {
-    struct fd_state* state = arg;
+    struct fd_state* state = (fd_state*)arg;
     char buf[1024];
     int i;
     size_t result;
@@ -117,7 +117,7 @@ do_read(evutil_socket_t fd, short events, void* arg) {
 void
 do_write(evutil_socket_t fd, short events, void* arg)
 {
-    struct fd_state* state = arg;
+    struct fd_state* state = (fd_state*)arg;
 
     while (state->n_written < state->write_upto) {
         size_t result = send(fd, state->buffer + state->n_written,
@@ -142,7 +142,7 @@ do_write(evutil_socket_t fd, short events, void* arg)
 void
 do_accept(evutil_socket_t listener, short event, void* arg)
 {
-    struct event_base* base = arg;
+    struct event_base* base = (event_base*)arg;
     struct sockaddr_storage ss;
     socklen_t slen = sizeof(ss);
     int fd = accept(listener, (struct sockaddr*)&ss, &slen);
@@ -173,6 +173,18 @@ run(void) {
     if (!base)
         return; /*XXXerr*/
 
+    printf("methods: %s\n", event_base_get_method(base));
+
+    int features;
+    features = event_base_get_features(base);
+    if ((features & EV_FEATURE_ET))
+        printf("  Edge-triggered events are supported.");
+    if ((features & EV_FEATURE_O1))
+        printf("  O(1) event notification is supported.");
+    if ((features & EV_FEATURE_FDS))
+        printf("  All FD types are supported.");
+    printf("\n");
+
     sin.sin_family = AF_INET;
     sin.sin_addr.s_addr = 0;
     sin.sin_port = htons(40713);
@@ -195,6 +207,8 @@ run(void) {
     event_add(listener_event, NULL);
 
     event_base_dispatch(base);
+
+    event_base_free(base);
 }
 
 int main(){
@@ -205,6 +219,19 @@ int main(){
     }
 
     setvbuf(stdout, NULL, _IONBF, 0);
+
+    const char** pstr = event_get_supported_methods();
+    if (nullptr == pstr) {
+        printf("event_get_supported methods failed...\n");
+        return 1;
+    }
+
+    printf("Libevent version: %s\n", event_get_version());
+
+    for (int i = 0; nullptr != pstr[i]; i++) {
+        printf("\t%s\t", pstr[i]);
+    }
+
 
     run();
 
