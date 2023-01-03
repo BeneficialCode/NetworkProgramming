@@ -79,6 +79,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ROT13Server", "ROT13Server\
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ROT13Server2", "ROT13Server2\ROT13Server2.vcxproj", "{F394F594-3743-43DF-9F71-6AB27BA59C72}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "LibeventSignalDemo", "LibeventSignalDemo\LibeventSignalDemo\LibeventSignalDemo.vcxproj", "{10F91C0F-3245-4640-8A4C-3D5375B717C8}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|ARM = Debug|ARM
@@ -559,6 +561,18 @@ Global
 		{F394F594-3743-43DF-9F71-6AB27BA59C72}.Release|x64.Build.0 = Release|x64
 		{F394F594-3743-43DF-9F71-6AB27BA59C72}.Release|x86.ActiveCfg = Release|Win32
 		{F394F594-3743-43DF-9F71-6AB27BA59C72}.Release|x86.Build.0 = Release|Win32
+		{10F91C0F-3245-4640-8A4C-3D5375B717C8}.Debug|ARM.ActiveCfg = Debug|Win32
+		{10F91C0F-3245-4640-8A4C-3D5375B717C8}.Debug|ARM64.ActiveCfg = Debug|Win32
+		{10F91C0F-3245-4640-8A4C-3D5375B717C8}.Debug|x64.ActiveCfg = Debug|x64
+		{10F91C0F-3245-4640-8A4C-3D5375B717C8}.Debug|x64.Build.0 = Debug|x64
+		{10F91C0F-3245-4640-8A4C-3D5375B717C8}.Debug|x86.ActiveCfg = Debug|Win32
+		{10F91C0F-3245-4640-8A4C-3D5375B717C8}.Debug|x86.Build.0 = Debug|Win32
+		{10F91C0F-3245-4640-8A4C-3D5375B717C8}.Release|ARM.ActiveCfg = Release|Win32
+		{10F91C0F-3245-4640-8A4C-3D5375B717C8}.Release|ARM64.ActiveCfg = Release|Win32
+		{10F91C0F-3245-4640-8A4C-3D5375B717C8}.Release|x64.ActiveCfg = Release|x64
+		{10F91C0F-3245-4640-8A4C-3D5375B717C8}.Release|x64.Build.0 = Release|x64
+		{10F91C0F-3245-4640-8A4C-3D5375B717C8}.Release|x86.ActiveCfg = Release|Win32
+		{10F91C0F-3245-4640-8A4C-3D5375B717C8}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

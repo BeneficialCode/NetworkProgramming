@@ -8,6 +8,8 @@
 #include <conio.h>
 #endif
 
+
+
 int main(int argc, char* argv[]) {
 #if defined(_WIN32)
 	WSADATA d;
@@ -17,6 +19,7 @@ int main(int argc, char* argv[]) {
 	}
 #endif
 
+#ifdef OPENSSL
 	SSL_library_init();
 	OpenSSL_add_all_algorithms();
 	SSL_load_error_strings();
@@ -26,6 +29,7 @@ int main(int argc, char* argv[]) {
 		fprintf(stderr, "SSL_CTX_new() failed.\n");
 		return 1;
 	}
+#endif
 
 	if (argc < 3) {
 		fprintf(stderr, "usage:tcp_client hostname port\n");
@@ -69,6 +73,7 @@ int main(int argc, char* argv[]) {
 	}
 	freeaddrinfo(peer_address);
 
+#ifdef  OPENSSL
 	SSL* ssl = SSL_new(ctx);
 	if (!ssl) {
 		fprintf(stderr, "SSL_new() failed.\n");
@@ -102,6 +107,7 @@ int main(int argc, char* argv[]) {
 	}
 
 	X509_free(cert);
+#endif //  OPENSSL
 
 	// Set to non-blocking. This needed to for the SSL 
 	// function. Without this, SSL_read() might block.
@@ -136,12 +142,14 @@ int main(int argc, char* argv[]) {
 
 		if (FD_ISSET(socket_peer, &reads)) {
 			char read[4096];
-			/*int bytes_received = recv(socket_peer, read, 4096, 0);*/
-			//printf("read before\n");
+#ifdef OPENSSL
 			int bytes_received = SSL_read(ssl, read, 4096);
+#else
+			int bytes_received = recv(socket_peer, read, 4096, 0);
+			printf("read before\n");
+#endif
 			if (bytes_received < 1) { // the connection has ended
-				/*printf("Connection closed by peer.\n");
-				break;*/
+#ifdef OPENSSL
 				int err;
 				if ((err = SSL_get_error(ssl, bytes_received)) &&
 					(err == SSL_ERROR_WANT_READ || err == SSL_ERROR_WANT_ASYNC)) {
@@ -151,6 +159,10 @@ int main(int argc, char* argv[]) {
 					printf("Connection closed by peer.\n");
 					break;
 				}
+#else
+				printf("Connection closed by peer.\n");
+				break;
+#endif
 			}
 			else {
 				printf("Received (%d bytes): %.*s",
@@ -169,12 +181,14 @@ int main(int argc, char* argv[]) {
 			if (!fgets(read, 4096, stdin))
 				break;
 			printf("Sending: %s", read);
-			//int bytes_sent = send(socket_peer, read, strlen(read), 0);
+			
+#ifdef OPENSSL
 			int bytes_sent = SSL_write(ssl, read, strlen(read));
+#else
+			int bytes_sent = send(socket_peer, read, strlen(read), 0);
+#endif
 			printf("Sent %d bytes.\n", bytes_sent);
 		}
-
-		//printf("while(1) end\n");
 	}
 
 	printf("Closing socket...\n");
